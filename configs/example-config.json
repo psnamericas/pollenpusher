@@ -1,0 +1,62 @@
+{
+  "app": {
+    "name": "Nebraska CDR Generator",
+    "instance_id": "ne-datacenter-01"
+  },
+  "ports": [
+    {
+      "device": "/dev/ttyUSB0",
+      "baud_rate": 9600,
+      "format": "vesta",
+      "mode": "replay",
+      "sample_file": "samples/Vesta/vestasample.csv",
+      "loop": true,
+      "calls_per_minute": 2.5,
+      "enabled": true,
+      "description": "Vesta simulator - replay mode"
+    },
+    {
+      "device": "/dev/ttyUSB1",
+      "baud_rate": 19200,
+      "format": "viper",
+      "mode": "synthetic",
+      "calls_per_minute": 1.0,
+      "enabled": true,
+      "description": "Viper simulator - synthetic mode",
+      "synthetic": {
+        "system_id": "nebraska",
+        "agent_count": 10,
+        "min_duration_sec": 30,
+        "max_duration_sec": 300,
+        "include_agent_events": true
+      }
+    }
+  ],
+  "timing": {
+    "jitter_percent": 20,
+    "startup_delay_sec": 5
+  },
+  "logging": {
+    "level": "info",
+    "base_path": "",
+    "filename": "cdrgenerator.log",
+    "max_size_mb": 50,
+    "max_backups": 5,
+    "compress": true
+  },
+  "monitoring": {
+    "port": 8080,
+    "stats_interval_sec": 60
+  },
+  "slack": {
+    "webhook_url": "",
+    "notify_startup": true,
+    "notify_shutdown": true,
+    "notify_errors": true
+  },
+  "recovery": {
+    "reconnect_delay_sec": 5,
+    "max_reconnect_delay_sec": 300,
+    "exponential_backoff": true
+  }
+}
