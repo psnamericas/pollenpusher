@@ -136,6 +136,20 @@ func (c *Channel) setState(state ChannelState) {
 }
 
 func (c *Channel) openPort() error {
+	// Special case: "stdout" device for testing
+	if c.config.Device == "stdout" {
+		c.port = serial.NewStdoutPort("stdout")
+		c.portStats = serial.NewPortWithStats(c.port)
+		return nil
+	}
+
+	// Special case: "null" device for silent testing
+	if c.config.Device == "null" || c.config.Device == "/dev/null" {
+		c.port = serial.NewMockPort("null")
+		c.portStats = serial.NewPortWithStats(c.port)
+		return nil
+	}
+
 	portCfg := serial.PortConfig{
 		Device:   c.config.Device,
 		BaudRate: c.config.BaudRate,

@@ -1,0 +1,51 @@
+{
+  "app": {
+    "name": "CDRGenerator Test",
+    "instance_id": "test-local"
+  },
+  "ports": [
+    {
+      "device": "stdout",
+      "baud_rate": 9600,
+      "format": "vesta",
+      "mode": "synthetic",
+      "calls_per_minute": 30,
+      "enabled": true,
+      "description": "Vesta test output to stdout",
+      "synthetic": {
+        "system_id": "nebraska-test",
+        "agent_count": 5,
+        "min_duration_sec": 30,
+        "max_duration_sec": 120,
+        "include_agent_events": true
+      }
+    }
+  ],
+  "timing": {
+    "jitter_percent": 10,
+    "startup_delay_sec": 0
+  },
+  "logging": {
+    "level": "debug",
+    "base_path": "",
+    "filename": "cdrgenerator.log",
+    "max_size_mb": 50,
+    "max_backups": 5,
+    "compress": false
+  },
+  "monitoring": {
+    "port": 8080,
+    "stats_interval_sec": 30
+  },
+  "slack": {
+    "webhook_url": "",
+    "notify_startup": false,
+    "notify_shutdown": false,
+    "notify_errors": false
+  },
+  "recovery": {
+    "reconnect_delay_sec": 5,
+    "max_reconnect_delay_sec": 60,
+    "exponential_backoff": true
+  }
+}
