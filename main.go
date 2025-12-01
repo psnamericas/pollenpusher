@@ -9,9 +9,13 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"cdrgenerator/config"
 	"cdrgenerator/format"
+	"cdrgenerator/monitoring"
+	"cdrgenerator/notify"
+	"cdrgenerator/output"
 	"cdrgenerator/serial"
 
 	// Import format packages for side-effect registration
@@ -144,12 +148,65 @@ func main() {
 		cancel()
 	}()
 
-	// TODO: Start output manager and monitoring server
-	// For now, just wait for shutdown
-	logger.Info("CDRGenerator ready - waiting for implementation of output channels")
+	// Create Slack notifier
+	slackNotifier := notify.NewSlackNotifier(&cfg.Slack, cfg.App.InstanceID, logger)
 
+	// Create and start output manager
+	outputMgr := output.NewManager(cfg, logger)
+	if err := outputMgr.Start(ctx); err != nil {
+		logger.Error("Failed to start output manager", "error", err)
+		os.Exit(1)
+	}
+
+	// Start monitoring server
+	monitorServer := monitoring.NewServer(&cfg.Monitoring, cfg.App.InstanceID, version, outputMgr, logger)
+	if err := monitorServer.Start(); err != nil {
+		logger.Error("Failed to start monitoring server", "error", err)
+	}
+
+	// Send startup notification
+	if err := slackNotifier.NotifyStartup(outputMgr.ChannelCount()); err != nil {
+		logger.Warn("Failed to send startup notification", "error", err)
+	}
+
+	startTime := time.Now()
+	logger.Info("CDRGenerator running",
+		"channels", outputMgr.ChannelCount(),
+		"monitoring_port", cfg.Monitoring.Port,
+	)
+
+	// Wait for shutdown
 	<-ctx.Done()
+
+	// Graceful shutdown
 	logger.Info("CDRGenerator shutting down")
+
+	// Stop monitoring server
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+	if err := monitorServer.Stop(shutdownCtx); err != nil {
+		logger.Warn("Error stopping monitoring server", "error", err)
+	}
+
+	// Stop output manager
+	outputMgr.Stop()
+
+	// Calculate total records sent
+	var totalRecords int64
+	for _, stats := range outputMgr.GetStats() {
+		totalRecords += stats.RecordsSent
+	}
+
+	// Send shutdown notification
+	uptime := time.Since(startTime)
+	if err := slackNotifier.NotifyShutdown(totalRecords, uptime); err != nil {
+		logger.Warn("Failed to send shutdown notification", "error", err)
+	}
+
+	logger.Info("CDRGenerator stopped",
+		"uptime", uptime,
+		"total_records", totalRecords,
+	)
 }
 
 func setupLogging(cfg *config.Config, debug bool) *slog.Logger {

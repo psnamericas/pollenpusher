@@ -1,0 +1,43 @@
+[Unit]
+Description=CDR Generator for 911 Testing
+Documentation=https://github.com/your-org/cdrgenerator
+After=network.target
+
+[Service]
+Type=simple
+User=cdrgenerator
+Group=dialout
+
+# Working directory
+WorkingDirectory=/opt/cdrgenerator
+
+# Main executable
+ExecStart=/usr/local/bin/cdrgenerator -config /etc/cdrgenerator/config.json
+
+# Graceful shutdown
+ExecStop=/bin/kill -SIGTERM $MAINPID
+TimeoutStopSec=30
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cdrgenerator
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+# Allow write to log directory
+ReadWritePaths=/var/log/cdrgenerator
+
+# Environment
+Environment=HOME=/opt/cdrgenerator
+
+[Install]
+WantedBy=multi-user.target
