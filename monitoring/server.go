@@ -2,6 +2,7 @@ package monitoring
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,9 @@ import (
 	"cdrgenerator/config"
 	"cdrgenerator/output"
 )
+
+//go:embed dashboard.html
+var dashboardHTML string
 
 // Server provides HTTP endpoints for monitoring
 type Server struct {
@@ -21,6 +25,11 @@ type Server struct {
 
 // NewServer creates a new monitoring server
 func NewServer(cfg *config.MonitoringConfig, instanceID, version string, manager *output.Manager, logger *slog.Logger) *Server {
+	return NewServerWithConfigPath(cfg, instanceID, version, manager, logger, "/etc/cdrgenerator/config.json")
+}
+
+// NewServerWithConfigPath creates a new monitoring server with a custom config path
+func NewServerWithConfigPath(cfg *config.MonitoringConfig, instanceID, version string, manager *output.Manager, logger *slog.Logger, configPath string) *Server {
 	mux := http.NewServeMux()
 
 	// Health endpoint
@@ -31,16 +40,26 @@ func NewServer(cfg *config.MonitoringConfig, instanceID, version string, manager
 	metricsHandler := NewMetricsHandler(manager)
 	mux.Handle("/metrics", metricsHandler)
 
-	// Root endpoint
+	// Config endpoint
+	configHandler := NewConfigHandler(configPath)
+	mux.Handle("/api/config", configHandler)
+
+	// Records endpoint
+	recordsHandler := NewRecordsHandler(manager)
+	mux.Handle("/api/records", recordsHandler)
+
+	// System ports endpoint
+	sysPortsHandler := NewSysPortsHandler()
+	mux.Handle("/api/sysports", sysPortsHandler)
+
+	// Dashboard endpoint
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, "CDRGenerator Monitoring\n\n")
-		fmt.Fprintf(w, "Endpoints:\n")
-		fmt.Fprintf(w, "  /health  - Health check (JSON)\n")
-		fmt.Fprintf(w, "  /metrics - Prometheus metrics\n")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, dashboardHTML)
 	})
 
 	return &Server{

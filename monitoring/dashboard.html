@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDR Generator Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+
+        .status-label {
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .status-value {
+            color: #333;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .status-healthy {
+            color: #28a745;
+        }
+
+        .status-degraded {
+            color: #ffc107;
+        }
+
+        .status-error {
+            color: #dc3545;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-running {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-stopped {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .refresh-info {
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+            border-top-color: #007bff;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 900px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
+
+        .modal-body {
+            padding: 20px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .record-item {
+            background: #f9f9f9;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #007bff;
+        }
+
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .record-data {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .no-records {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        tbody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CDR Generator Dashboard</h1>
+
+        <div class="controls">
+            <button onclick="fetchData()">Refresh Now</button>
+            <label>
+                <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()">
+                Auto-refresh (2s)
+            </label>
+        </div>
+
+        <div id="error" style="display:none;" class="error-message"></div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            Loading data...
+        </div>
+
+        <div id="content" style="display:none;">
+            <div class="status-card">
+                <h2>Service Status</h2>
+                <div class="refresh-info" id="lastUpdate"></div>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-label">Status</div>
+                        <div class="status-value" id="overallStatus">-</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Instance ID</div>
+                        <div class="status-value" id="instanceId">-</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Version</div>
+                        <div class="status-value" id="version">-</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Uptime</div>
+                        <div class="status-value" id="uptime">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-card">
+                <h2>Active CDR Output Channels</h2>
+                <table id="portsTable">
+                    <thead>
+                        <tr>
+                            <th>Device</th>
+                            <th>Format</th>
+                            <th>Mode</th>
+                            <th>State</th>
+                            <th>Records</th>
+                            <th>Bytes</th>
+                            <th>Errors</th>
+                            <th>Last Record</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portsBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="status-card">
+                <h2>System COM Ports</h2>
+                <table id="sysPortsTable">
+                    <thead>
+                        <tr>
+                            <th>COM Port</th>
+                            <th>Device</th>
+                            <th>UART</th>
+                            <th>I/O Port</th>
+                            <th>IRQ</th>
+                            <th>TX Bytes</th>
+                            <th>RX Bytes</th>
+                            <th>Signals</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sysPortsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Modal -->
+    <div id="recordsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Recent Records</h2>
+                <button class="close" onclick="closeRecordsModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading records...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let autoRefreshInterval = null;
+        const API_URL = window.location.origin + '/health';
+        const SYSPORTS_API_URL = window.location.origin + '/api/sysports';
+
+        function formatUptime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${secs}s`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            }
+            return `${secs}s`;
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+
+        function getStatusClass(status) {
+            if (status === 'healthy') return 'status-healthy';
+            if (status === 'degraded') return 'status-degraded';
+            return 'status-error';
+        }
+
+        function getStateBadge(state) {
+            if (state === 'running') return 'badge-running';
+            if (state === 'error') return 'badge-error';
+            return 'badge-stopped';
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                updateUI(data);
+                hideError();
+            } catch (error) {
+                showError(`Failed to fetch data: ${error.message}`);
+            }
+
+            // Fetch system ports data
+            try {
+                const sysResponse = await fetch(SYSPORTS_API_URL);
+                if (sysResponse.ok) {
+                    const sysData = await sysResponse.json();
+                    updateSysPortsUI(sysData);
+                }
+            } catch (error) {
+                console.error('Failed to fetch system ports:', error);
+            }
+        }
+
+        function updateUI(data) {
+            // Show content, hide loading
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+
+            // Update last update time
+            document.getElementById('lastUpdate').textContent =
+                `Last updated: ${new Date().toLocaleTimeString()}`;
+
+            // Update status
+            const statusEl = document.getElementById('overallStatus');
+            statusEl.textContent = data.status.toUpperCase();
+            statusEl.className = 'status-value ' + getStatusClass(data.status);
+
+            document.getElementById('instanceId').textContent = data.instance_id;
+            document.getElementById('version').textContent = data.version;
+            document.getElementById('uptime').textContent = formatUptime(data.uptime_sec);
+
+            // Update ports table
+            const tbody = document.getElementById('portsBody');
+            tbody.innerHTML = '';
+
+            for (const [device, port] of Object.entries(data.ports)) {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td><strong>${port.device}</strong></td>
+                    <td>${port.format}</td>
+                    <td>${port.mode}</td>
+                    <td><span class="badge ${getStateBadge(port.state)}">${port.state}</span></td>
+                    <td>${port.records_sent.toLocaleString()}</td>
+                    <td>${port.bytes_sent.toLocaleString()}</td>
+                    <td>${port.errors}</td>
+                    <td>${formatTime(port.last_record_time)}</td>
+                `;
+                // Add click handler to show records
+                row.style.cursor = 'pointer';
+                row.onclick = () => showRecords(port.device);
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function updateSysPortsUI(data) {
+            const tbody = document.getElementById('sysPortsBody');
+            tbody.innerHTML = '';
+
+            if (!data.ports || data.ports.length === 0) {
+                const row = tbody.insertRow();
+                row.innerHTML = '<td colspan="9" style="text-align: center; color: #999;">No COM ports detected</td>';
+                return;
+            }
+
+            for (const port of data.ports) {
+                const row = tbody.insertRow();
+
+                const statusBadge = port.active
+                    ? '<span class="badge badge-running">Active</span>'
+                    : '<span class="badge badge-stopped">Idle</span>';
+
+                const signals = port.signals || '-';
+
+                row.innerHTML = `
+                    <td><strong>${port.com_port}</strong></td>
+                    <td>${port.device}</td>
+                    <td>${port.uart}</td>
+                    <td><code>${port.port}</code></td>
+                    <td>${port.irq}</td>
+                    <td>${port.tx.toLocaleString()}</td>
+                    <td>${port.rx.toLocaleString()}</td>
+                    <td><code>${signals}</code></td>
+                    <td>${statusBadge}</td>
+                `;
+
+                // Highlight active ports
+                if (port.active) {
+                    row.style.backgroundColor = '#f0f8ff';
+                }
+            }
+        }
+
+        function toggleAutoRefresh() {
+            const checked = document.getElementById('autoRefresh').checked;
+            if (checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) return;
+            autoRefreshInterval = setInterval(fetchData, 2000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        // Records modal functions
+        async function showRecords(device) {
+            const modal = document.getElementById('recordsModal');
+            const modalBody = document.getElementById('modalBody');
+            const modalTitle = document.getElementById('modalTitle');
+
+            // Show modal with loading state
+            modalTitle.textContent = `Recent Records - ${device}`;
+            modalBody.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading records...
+                </div>
+            `;
+            modal.style.display = 'block';
+
+            try {
+                const response = await fetch(`/api/records?device=${encodeURIComponent(device)}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                displayRecords(data.records);
+            } catch (error) {
+                modalBody.innerHTML = `
+                    <div class="error-message">
+                        Failed to load records: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function displayRecords(records) {
+            const modalBody = document.getElementById('modalBody');
+
+            if (!records || records.length === 0) {
+                modalBody.innerHTML = `
+                    <div class="no-records">
+                        No recent records available
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            records.forEach((record, index) => {
+                const timestamp = new Date(record.timestamp);
+                html += `
+                    <div class="record-item">
+                        <div class="record-header">
+                            <span><strong>Record #${index + 1}</strong></span>
+                            <span>${timestamp.toLocaleString()}</span>
+                            <span>${record.size} bytes</span>
+                        </div>
+                        <div class="record-data">${escapeHtml(record.data)}</div>
+                    </div>
+                `;
+            });
+
+            modalBody.innerHTML = html;
+        }
+
+        function closeRecordsModal() {
+            document.getElementById('recordsModal').style.display = 'none';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('recordsModal');
+            if (event.target === modal) {
+                closeRecordsModal();
+            }
+        }
+
+        // Initial load
+        fetchData();
+        startAutoRefresh();
+    </script>
+</body>
+</html>

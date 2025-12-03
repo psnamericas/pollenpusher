@@ -40,6 +40,11 @@ type Channel struct {
 	stats      ChannelStats
 	statsMutex sync.RWMutex
 
+	// Recent records buffer (circular buffer)
+	recentRecords []RecentRecord
+	recentIndex   int
+	recentMutex   sync.RWMutex
+
 	// Control
 	stopCh chan struct{}
 	wg     sync.WaitGroup
@@ -55,6 +60,13 @@ type ChannelStats struct {
 	LastError      string
 }
 
+// RecentRecord represents a recently sent CDR
+type RecentRecord struct {
+	Timestamp time.Time `json:"timestamp"`
+	Data      string    `json:"data"`
+	Size      int       `json:"size"`
+}
+
 // NewChannel creates a new output channel
 func NewChannel(
 	portCfg *config.PortConfig,
@@ -63,12 +75,14 @@ func NewChannel(
 	logger *slog.Logger,
 ) *Channel {
 	return &Channel{
-		config:    portCfg,
-		recovery:  recoveryCfg,
-		generator: gen,
-		logger:    logger.With("device", portCfg.Device, "format", portCfg.Format),
-		state:     StateInitializing,
-		stopCh:    make(chan struct{}),
+		config:        portCfg,
+		recovery:      recoveryCfg,
+		generator:     gen,
+		logger:        logger.With("device", portCfg.Device, "format", portCfg.Format),
+		state:         StateInitializing,
+		stopCh:        make(chan struct{}),
+		recentRecords: make([]RecentRecord, 10), // Store last 10 records
+		recentIndex:   0,
 		stats: ChannelStats{
 			StartTime: time.Now(),
 		},
@@ -214,6 +228,9 @@ func (c *Channel) sendNextRecord(ctx context.Context) error {
 	c.stats.LastRecordTime = time.Now()
 	c.statsMutex.Unlock()
 
+	// Store in recent records buffer
+	c.storeRecentRecord(data, n)
+
 	c.portStats.RecordSent()
 
 	c.logger.Debug("Sent record",
@@ -289,4 +306,44 @@ func (c *Channel) Format() string {
 // Mode returns the mode
 func (c *Channel) Mode() string {
 	return c.config.Mode
+}
+
+// storeRecentRecord stores a record in the circular buffer
+func (c *Channel) storeRecentRecord(data []byte, size int) {
+	c.recentMutex.Lock()
+	defer c.recentMutex.Unlock()
+
+	c.recentRecords[c.recentIndex] = RecentRecord{
+		Timestamp: time.Now(),
+		Data:      string(data),
+		Size:      size,
+	}
+	c.recentIndex = (c.recentIndex + 1) % len(c.recentRecords)
+}
+
+// GetRecentRecords returns the N most recent records
+func (c *Channel) GetRecentRecords(limit int) []RecentRecord {
+	c.recentMutex.RLock()
+	defer c.recentMutex.RUnlock()
+
+	if limit > len(c.recentRecords) {
+		limit = len(c.recentRecords)
+	}
+
+	result := make([]RecentRecord, 0, limit)
+
+	// Start from most recent and go backwards
+	for i := 0; i < limit; i++ {
+		idx := (c.recentIndex - 1 - i + len(c.recentRecords)) % len(c.recentRecords)
+		record := c.recentRecords[idx]
+
+		// Skip empty records (haven't filled buffer yet)
+		if record.Size == 0 {
+			continue
+		}
+
+		result = append(result, record)
+	}
+
+	return result
 }

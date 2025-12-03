@@ -150,3 +150,17 @@ func (m *Manager) ChannelCount() int {
 	defer m.mu.RUnlock()
 	return len(m.channels)
 }
+
+// GetRecentRecords returns recent CDR records for a specific device
+func (m *Manager) GetRecentRecords(device string, limit int) []RecentRecord {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, channel := range m.channels {
+		if channel.Device() == device {
+			return channel.GetRecentRecords(limit)
+		}
+	}
+
+	return []RecentRecord{}
+}
